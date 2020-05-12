@@ -723,7 +723,7 @@ extern "C" {
     /// registers. See `Instance::with_activation_routine` for more information.
     ///
     /// Note that `rbx` is used to store the address of the guest code because it is a callee-saved
-    /// register in the System V calling convention. It is also a non-violatile register on
+    /// register in the System V calling convention. It is also a non-volatile register on
     /// Windows, which is a nice additional benefit.
     ///
     /// For more information, see `Instance::swap_and_return`, `Instance::with_activation_routine`,

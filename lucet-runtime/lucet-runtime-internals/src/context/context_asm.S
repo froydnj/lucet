@@ -208,7 +208,7 @@ _lucet_context_set:
 //
 // Note that `rbx` is used to store the address of the guest code because it is
 // a callee-saved register in the System V calling convention. It is also a
-// non-violatile register on Windows, which is a nice benefit.
+// non-volatile register on Windows, which is a nice benefit.
 lucet_context_activate:
 _lucet_context_activate:
     // First, we call the entry callback whose address is stored in `rsi`,
