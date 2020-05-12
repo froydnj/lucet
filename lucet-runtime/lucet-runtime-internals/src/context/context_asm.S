@@ -29,6 +29,21 @@
 
 */
 
+// These offsets/sizes come from the `context::Context` structure.
+#define GPREGS_SIZE (8*9)
+// Take into account invisible padding between `gpregs` and `fpregs`
+#define FPREGS_OFFSET (GPREGS_SIZE + 8)
+#define FPREGS_SIZE (8*16)
+#define RETVALS_GP_OFFSET (FPREGS_OFFSET + FPREGS_SIZE)
+#define RETVALS_GP_SIZE (2*8)
+#define RETVAL_FP_OFFSET (RETVALS_GP_OFFSET + RETVALS_GP_SIZE)
+#define RETVAL_FP_SIZE 16
+#define PARENT_CTX_OFFSET (RETVAL_FP_OFFSET + RETVAL_FP_SIZE)
+#define PARENT_CTX_SIZE 8
+#define BACKSTOP_CALLBACK_OFFSET (PARENT_CTX_OFFSET + PARENT_CTX_SIZE)
+#define BACKSTOP_CALLBACK_SIZE 8
+#define CALLBACK_DATA_OFFSET (BACKSTOP_CALLBACK_OFFSET + BACKSTOP_CALLBACK_SIZE)
+
 .text
 .globl lucet_context_bootstrap
 #ifdef __ELF__
@@ -66,13 +81,13 @@ lucet_context_backstop:
 _lucet_context_backstop:
     // Note that `rbp` here really has no relation to any stack!
     // Instead, it's a pointer to the guest context.
-    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rdi /* load the parent context to forward values in return value registers */
-    mov %rax, (10*8 + 8*16 + 8*0)(%rbp) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
-    mov %rdx, (10*8 + 8*16 + 8*1)(%rbp)
-    movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rbp) /* floating-point return value */
+    mov PARENT_CTX_OFFSET(%rbp), %rdi /* load the parent context to forward values in return value registers */
+    mov %rax, RETVALS_GP_OFFSET(%rbp) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
+    mov %rdx, (RETVALS_GP_OFFSET + 8)(%rbp)
+    movdqu %xmm0, RETVAL_FP_OFFSET(%rbp) /* floating-point return value */
 
     // load `backstop_callback`, but skip calling it if it's null
-    mov (10*8 + 8*16 + 8*2 + 16 + 8)(%rbp), %rsi
+    mov BACKSTOP_CALLBACK_OFFSET(%rbp), %rsi
     test %rsi, %rsi
 #ifdef __ELF__
     jz no_backstop_callback@PLT
@@ -81,13 +96,13 @@ _lucet_context_backstop:
 #endif
 
     // load `callback_data`, arg 1
-    mov (10*8 + 8*16 + 8*2 + 16 + 8 + 8)(%rbp), %rdi
+    mov CALLBACK_DATA_OFFSET(%rbp), %rdi
     // call `backstop_callback`
     call *%rsi
 
 no_backstop_callback:
     mov %rbp, %rdi /* load the guest context to the "from" argument */
-    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rsi /* load the parent context to the "to" argument */
+    mov PARENT_CTX_OFFSET(%rbp), %rsi /* load the parent context to the "to" argument */
 
 #ifdef __ELF__
     jmp lucet_context_swap@PLT
@@ -119,14 +134,14 @@ _lucet_context_swap:
     mov %r15, (7*8)(%rdi)
     mov %rsi, (8*8)(%rdi)
 
-    movdqu %xmm0, (10*8 + 0*16)(%rdi)
-    movdqu %xmm1, (10*8 + 1*16)(%rdi)
-    movdqu %xmm2, (10*8 + 2*16)(%rdi)
-    movdqu %xmm3, (10*8 + 3*16)(%rdi)
-    movdqu %xmm4, (10*8 + 4*16)(%rdi)
-    movdqu %xmm5, (10*8 + 5*16)(%rdi)
-    movdqu %xmm6, (10*8 + 6*16)(%rdi)
-    movdqu %xmm7, (10*8 + 7*16)(%rdi)
+    movdqu %xmm0, (FPREGS_OFFSET + 0*16)(%rdi)
+    movdqu %xmm1, (FPREGS_OFFSET + 1*16)(%rdi)
+    movdqu %xmm2, (FPREGS_OFFSET + 2*16)(%rdi)
+    movdqu %xmm3, (FPREGS_OFFSET + 3*16)(%rdi)
+    movdqu %xmm4, (FPREGS_OFFSET + 4*16)(%rdi)
+    movdqu %xmm5, (FPREGS_OFFSET + 5*16)(%rdi)
+    movdqu %xmm6, (FPREGS_OFFSET + 6*16)(%rdi)
+    movdqu %xmm7, (FPREGS_OFFSET + 7*16)(%rdi)
 
     // load everything from offsets from rsi (2nd arg)
     mov (0*8)(%rsi), %rbx
@@ -138,14 +153,14 @@ _lucet_context_swap:
     mov (6*8)(%rsi), %r14
     mov (7*8)(%rsi), %r15
 
-    movdqu (10*8 + 0*16)(%rsi), %xmm0
-    movdqu (10*8 + 1*16)(%rsi), %xmm1
-    movdqu (10*8 + 2*16)(%rsi), %xmm2
-    movdqu (10*8 + 3*16)(%rsi), %xmm3
-    movdqu (10*8 + 4*16)(%rsi), %xmm4
-    movdqu (10*8 + 5*16)(%rsi), %xmm5
-    movdqu (10*8 + 6*16)(%rsi), %xmm6
-    movdqu (10*8 + 7*16)(%rsi), %xmm7
+    movdqu (FPREGS_OFFSET + 0*16)(%rsi), %xmm0
+    movdqu (FPREGS_OFFSET + 1*16)(%rsi), %xmm1
+    movdqu (FPREGS_OFFSET + 2*16)(%rsi), %xmm2
+    movdqu (FPREGS_OFFSET + 3*16)(%rsi), %xmm3
+    movdqu (FPREGS_OFFSET + 4*16)(%rsi), %xmm4
+    movdqu (FPREGS_OFFSET + 5*16)(%rsi), %xmm5
+    movdqu (FPREGS_OFFSET + 6*16)(%rsi), %xmm6
+    movdqu (FPREGS_OFFSET + 7*16)(%rsi), %xmm7
 
     // restore rsi when we're done with the context pointer
     mov (8*8)(%rsi), %rsi
@@ -175,14 +190,14 @@ _lucet_context_set:
     mov (7*8)(%rdi), %r15
     mov (8*8)(%rdi), %rsi
 
-    movdqu (10*8 + 0*16)(%rdi), %xmm0
-    movdqu (10*8 + 1*16)(%rdi), %xmm1
-    movdqu (10*8 + 2*16)(%rdi), %xmm2
-    movdqu (10*8 + 3*16)(%rdi), %xmm3
-    movdqu (10*8 + 4*16)(%rdi), %xmm4
-    movdqu (10*8 + 5*16)(%rdi), %xmm5
-    movdqu (10*8 + 6*16)(%rdi), %xmm6
-    movdqu (10*8 + 7*16)(%rdi), %xmm7
+    movdqu (FPREGS_OFFSET + 0*16)(%rdi), %xmm0
+    movdqu (FPREGS_OFFSET + 1*16)(%rdi), %xmm1
+    movdqu (FPREGS_OFFSET + 2*16)(%rdi), %xmm2
+    movdqu (FPREGS_OFFSET + 3*16)(%rdi), %xmm3
+    movdqu (FPREGS_OFFSET + 4*16)(%rdi), %xmm4
+    movdqu (FPREGS_OFFSET + 5*16)(%rdi), %xmm5
+    movdqu (FPREGS_OFFSET + 6*16)(%rdi), %xmm6
+    movdqu (FPREGS_OFFSET + 7*16)(%rdi), %xmm7
 
     // load rdi from itself last
     mov (3*8)(%rdi), %rdi
